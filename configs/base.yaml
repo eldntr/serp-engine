@@ -1,0 +1,4 @@
+app_name: "serp-crawler-engine"
+environment: "development"
+rate_limit: 100
+concurrency: 10

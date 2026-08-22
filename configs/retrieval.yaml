@@ -1,0 +1,10 @@
+dense_model_name: "BAAI/bge-m3"
+sparse_k1: 1.5
+sparse_b: 0.75
+sparse_avg_doc_len: 200.0
+qdrant_host: "localhost"
+qdrant_port: 6333
+qdrant_collection_name: "serp_documents"
+qdrant_dense_dim: 1024
+rrf_k: 60
+cross_encoder_model_name: "BAAI/bge-reranker-large"

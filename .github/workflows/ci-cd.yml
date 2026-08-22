@@ -1,0 +1,42 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Install Dependencies
+      run: |
+        uv sync
+        # uv run playwright install chromium --with-deps
+
+    - name: Run Benchmark Tests
+      run: |
+        # Menjalankan evaluasi IR metrics sebagai tes kelulusan (pass/fail)
+        uv run python -m src.evaluation.run_benchmark
+
+  # (Opsional) Job untuk build & deploy image Docker ke registry
+  # deploy:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - ...

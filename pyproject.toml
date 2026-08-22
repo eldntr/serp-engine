@@ -1,0 +1,39 @@
+[project]
+name = "serp-crawler-engine"
+version = "0.1.0"
+description = "High-performance hybrid crawler for SERP engine"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx[http2]>=0.28.0",      # Async HTTP client dengan HTTP/2 support
+    "playwright>=1.50.0",        # Headless browser automation
+    "fake-useragent>=2.0.0",     # Dynamic realistic user-agent rotation
+    "trafilatura>=2.0.0",        # HTML text & metadata extractor
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "loguru>=0.7.3",
+    "pyyaml>=6.0.2",
+    "trafilatura>=2.0.0",
+    "readability-lxml>=0.8.1",   # Fallback readability heuristic algorithm
+    "datasketch>=1.6.5",         # MinHash & LSH (Locality-Sensitive Hashing)
+    "nltk>=3.9.1",               # Shingling & Tokenization preprocessing  
+    "arq>=0.26.1",
+    "redis>=5.2.0",
+    "urllib3>=2.3.0",
+    # Modul Information Retrieval, Embeddings & Vector DB
+    "qdrant-client>=1.12.0",      # Qdrant Vector Engine Client (mendukung hybrid sparse + dense)
+    "sentence-transformers>=3.3.0", # Dense embedding & Cross-Encoder inference
+    "FlagEmbedding>=1.3.0",       # Native BAAI/bge-m3 & bge-reranker support
+    "torch>=2.2.0",
+    "numpy>=1.26.0",
+    # Modul Serving API & LLM Synthesizer
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "openai>=1.58.0",             # Integrasi OpenAI / Ollama / Local LLM
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crawler"]
