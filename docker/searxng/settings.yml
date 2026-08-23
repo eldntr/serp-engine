@@ -1,0 +1,17 @@
+use_default_settings: true
+general:
+  debug: false
+  instance_name: "Local SearXNG"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json   # WAJIB: agar bisa diambil via API oleh discovery provider
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "ganti_dengan_random_secret_key_bebas_disini"
+  limiter: false # Nonaktifkan rate limiter internal untuk query lokal crawler

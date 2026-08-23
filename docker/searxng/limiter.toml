@@ -1,0 +1,2 @@
+[botdetection.ip_limit]
+filter_link_local = true
