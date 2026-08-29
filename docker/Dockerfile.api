@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files dulu untuk layer caching yang optimal
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies (tanpa dev deps, tanpa editable install)
+RUN uv sync --frozen --no-dev --no-editable
+
+# Copy source code
+COPY src/ ./src/
+COPY configs/ ./configs/
+
+EXPOSE 8000
+
+CMD ["uv", "run", "uvicorn", "src.serving.main:app", "--host", "0.0.0.0", "--port", "8000"]

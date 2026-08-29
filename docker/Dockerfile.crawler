@@ -1,0 +1,41 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (Playwright membutuhkan beberapa library browser)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files dulu untuk layer caching yang optimal
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies (tanpa dev deps, tanpa editable install)
+RUN uv sync --frozen --no-dev --no-editable
+
+# Install Playwright Chromium headless shell
+RUN uv run playwright install chromium --with-deps
+
+# Copy source code
+COPY src/ ./src/
+COPY configs/ ./configs/
+
+# Jalankan ARQ worker
+CMD ["uv", "run", "arq", "src.crawler.queue.redis_tasks.WorkerSettings"]

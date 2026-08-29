@@ -1,0 +1,53 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Pytest & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.github/
+.gitignore
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs & hasil test
+logs/
+tests/results/
+
+# Environment files (disuntik saat runtime via env_file)
+.env
+
+# HuggingFace / model cache (sangat besar!)
+.cache/
+*.bin
+*.safetensors
+*.ot
+
+# UV lock tidak dibutuhkan saat runtime
+# (uv.lock diperlukan untuk uv sync, jadi tetap di-include)
+
+# Data & benchmarks lokal
+data/
+
+# Docker sendiri
+docker/
+
+# Dokumentasi
+README.md
+*.md
