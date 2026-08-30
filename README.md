@@ -1,132 +1,143 @@
-### Install Playwright Chromium
+# SERP Agent & Search Engine
+
+An autonomous search, crawl, index, and retrieval agent system built on top of FastAPI, LangGraph, Qdrant, and SearXNG. It supports both a deterministic sequential pipeline and a dynamic tool-calling ReAct agent loop.
+
+---
+
+## 🏗️ Architecture
+
+The system supports two core graph execution modes:
+
+### 1. Linear Mode (Deterministic Sequential Pipeline)
+A fixed DAG execution flow optimized for speed, reliability, and deterministic crawling/retrieval.
+
+```mermaid
+graph TD
+    Input[User Prompt] --> QGen[QueryGeneratorNode]
+    QGen -->|Search Queries| Search[SearchDiscoveryNode]
+    Search -->|URLs| Crawl[CrawlerNode]
+    Crawl -->|Documents| Index[IndexerNode]
+    Index -->|Index Chunks| Qdrant[(Qdrant DB)]
+    Index --> Retriever[RetrieverNode]
+    Retriever -->|Semantic Query| Qdrant
+    Qdrant -->|Top Chunks| Retriever
+    Retriever -->|Top K Chunks| Synthesize[SynthesizerNode]
+    Synthesize -->|Generate Grounded Answer| Response[Grounded Response]
+```
+
+### 2. ReAct Mode (Dynamic Agent Tool-Calling Loop)
+A reasoning-based loop where the LLM dynamically chooses which search, crawl, or retrieve tools to call iteratively based on the prompt complexity.
+
+```mermaid
+graph TD
+    Input[User Prompt] --> Agent[Agent Node / LLM]
+    Agent --> ToolRouter{Has Tool Calls?}
+    
+    ToolRouter -->|Yes| ExecTools[Execute Tools Node]
+    ExecTools -->|search_web| SearchNode[SearXNG Search]
+    ExecTools -->|crawl_and_index_pages| CrawlNode[Crawler & Indexer]
+    ExecTools -->|retrieve_relevant_chunks| RetrieveNode[Qdrant Retriever]
+    
+    SearchNode --> Agent
+    CrawlNode --> Agent
+    RetrieveNode --> Agent
+    
+    ToolRouter -->|No| Response[Grounded Response]
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+Ensure you have Python 3.11+, Docker, and Redis running.
 
 ```bash
+# Start Redis container
+docker run -d -p 6379:6379 --name redis-serp redis:7-alpine
+
+# Install Playwright dependencies
 playwright install chromium
 ```
-Cara Menjalankan Pengujian
-Nyalakan Redis Server (via Docker atau lokal):
 
-Bash
-docker run -d -p 6379:6379 --name redis-serp redis:7-alpine
-Jalankan Background Worker ARQ di terminal pertama:
+### 2. Environment Configuration
+Copy `.env.example` to `.env` and configure your API keys and local settings:
+```env
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:32b-instruct-q4_K_M
+SEARXNG_BASE_URL=http://localhost:8080
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
 
-Bash
-arq src.crawler.queue.redis_tasks.WorkerSettings
-Jalankan Pengujian Enqueue Job di terminal kedua:
+### 3. Run background worker & dev server
+In separate terminals, run the tasks worker and dev api server:
+```bash
+# Start crawler task worker
+uv run arq src.crawler.queue.redis_tasks.WorkerSettings
 
-Bash
-python -m tests.test_discovery
+# Start the FastAPI dev server
+uv run uvicorn src.serving.main:app --reload --port 8000
+```
 
+---
 
-fix the problem later:
-(serp-crawler-engine) eldin@Flow:~/workspace/serp-engine$ python -m tests.test_crawler
-=== 0. TESTING ROBOTS.TXT ===
-[ROBOTS] https://en.wikipedia.org/wiki/Information_retrieval
-  -> Allowed: True | Crawl Delay: None
-[ROBOTS] https://quotes.toscrape.com/js/
-  -> Allowed: True | Crawl Delay: None
-[ROBOTS] https://www.mims.com/indonesia
-  -> Allowed: True | Crawl Delay: None
+## 📡 API Usage & cURL Guides
 
-=== 1. TESTING STATIC CRAWLER (HTTPX) ===
-[STATIC] https://en.wikipedia.org/wiki/Information_retrieval
-  -> Status: 200 | Size: 326715 chars | Time: 0.210s
-[STATIC] https://quotes.toscrape.com/js/
-  -> Status: 200 | Size: 5806 chars | Time: 1.026s
-[STATIC] https://www.mims.com/indonesia
-  -> Status: 403 | Size: 5750 chars | Time: 0.944s
+The agent search endpoint is hosted at `/api/v1/agent/search`.
 
-=== 2. TESTING DYNAMIC CRAWLER (PLAYWRIGHT) ===
-[DYNAMIC] https://en.wikipedia.org/wiki/Information_retrieval
-  -> Status: 200 | Size: 601831 chars | Time: 1.719s
-[DYNAMIC] https://quotes.toscrape.com/js/
-  -> Status: 200 | Size: 8940 chars | Time: 2.195s
-[DYNAMIC] https://www.mims.com/indonesia
-  -> Status: 0 | Size: 0 chars | Time: 5.055s
-  -> Error: Page.goto: net::ERR_NETWORK_CHANGED at https://www.mims.com/indonesia
-Call log:
-  - navigating to "https://www.mims.com/indonesia", waiting until "networkidle"
+### 1. Linear Mode Request
+Use this mode for quick, deterministic search pipelines.
 
+```bash
+curl -X POST http://localhost:8000/api/v1/agent/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Apa saja manfaat kunyit untuk kesehatan?",
+    "mode": "linear",
+    "max_queries": 2,
+    "num_results_per_query": 2
+  }'
+```
 
-to do:
-devops with redis or kube or whatever
-build fe or web based with llm
+### 2. ReAct Mode Request (Conversational with Session Memory)
+Use this mode for complex queries requiring multi-step reasoning. Pass a `thread_id` to maintain conversation thread memory.
 
-serp-engine/
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml
-├── configs/
-│   ├── base.yaml               # Konfigurasi umum (rate limit, concurrency)
-│   ├── crawler.yaml            # Header pool, proxy, timeouts
-│   └── retrieval.yaml          # Model weights, top-k, RRF constant (k=60)
-│
-├── data/                       # Local volume / fixtures
-│   ├── raw/
-│   └── benchmarks/             # Dataset evaluasi (MS MARCO subset / Custom Q&A)
-│
-├── docker/
-│   ├── Dockerfile.crawler
-│   ├── Dockerfile.api
-│   └── docker-compose.yml      # Orkestrasi Redis, Qdrant, PostgreSQL, & Workers
-│
-├── src/
-│   ├── __init__.py
-│   │
-│   ├── core/                   # Shared kernel & settings
-│   │   ├── config.py           # Pydantic BaseSettings
-│   │   ├── exceptions.py
-│   │   └── logger.py
-│   │
-│   ├── crawler/                # Modul 1: Distributed Ingestion
-│   │   ├── engine/
-│   │   │   ├── dynamic.py      # Playwright async browser pool
-│   │   │   └── static.py       # Async HTTPX worker
-│   │   ├── parsers/
-│   │   │   ├── cleaner.py      # Trafilatura / Readability pipeline
-│   │   │   └── deduplicator.py # MinHash LSH / SimHash logic
-│   │   ├── queue/
-│   │   │   └── redis_tasks.py  # Celery / ARQ task definitions
-│   │   └── robots.py           # Politeness & robots.txt parser
-│   │
-│   ├── search/                 # Modul 2: Information Retrieval & AI
-│   │   ├── encoders/
-│   │   │   ├── dense.py        # BAAI/bge-m3 dense embedder
-│   │   │   └── sparse.py       # BM25 / SPLADE / Sparse token weights
-│   │   ├── indexing/
-│   │   │   ├── qdrant_client.py# Vector DB connection & payload schemas
-│   │   │   └── pg_store.py     # Metadata relational repository
-│   │   ├── rankers/
-│   │   │   ├── rrf.py          # Reciprocal Rank Fusion implementation
-│   │   │   └── cross_encoder.py# BAAI/bge-reranker-large scoring
-│   │   └── query/
-│   │       ├── expansion.py    # HyDE & synonym rewriting
-│   │       └── snippets.py     # Semantic sliding-window extractor
-│   │
-│   ├── serving/                # Modul 3: Backend API & Agents
-│   │   ├── api/
-│   │   │   ├── v1/
-│   │   │   │   ├── endpoints/
-│   │   │   │   │   ├── crawl.py# Trigger & webhook endpoints
-│   │   │   │   │   └── search.py# SERP search REST API
-│   │   │   │   └── router.py
-│   │   ├── schemas/
-│   │   │   ├── crawl.py        # Pydantic crawl request/response
-│   │   │   └── serp.py         # SERP JSON schema & payload contract
-│   │   ├── synthesizer/
-│   │   │   └── rag_agent.py    # Grounded generative summary + citations
-│   │   └── main.py             # FastAPI entrypoint
-│   │
-│   └── evaluation/             # Modul 4: IR Metrics & Benchmark
-│       ├── metrics.py          # MRR@k, NDCG@k, MAP implementation
-│       └── run_benchmark.py    # Evaluasi akurasi retrieval & profiling latency
-│
-├── tests/
-│   ├── test_crawler.py
-│   ├── test_retrieval.py
-│   └── test_api.py
-│
-├── .env.example
-├── .gitignore
-├── pyproject.toml              # Dependency management (Poetry / UV)
-└── README.md                   # Dokumentasi arsitektur & cara deploy
+```bash
+curl -X POST http://localhost:8000/api/v1/agent/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Bandingkan kandungan kurkumin pada kunyit and temulawak.",
+    "mode": "react",
+    "thread_id": "user-session-999"
+  }'
+```
+
+### 3. Example JSON Response
+Both modes return the same structured payload:
+
+```json
+{
+  "prompt": "Apa saja manfaat kunyit untuk kesehatan?",
+  "queries": [
+    "manfaat kunyit untuk kesehatan",
+    "kandungan senyawa aktif kunyit"
+  ],
+  "urls": [
+    "https://example.com/kunyit-manfaat",
+    "https://example.com/kunyit-senyawa"
+  ],
+  "indexed_count": 4,
+  "answer": "Kunyit mengandung kurkumin [1] yang memiliki sifat anti-inflamasi dan antioksidan yang baik untuk tubuh."
+}
+```
+
+---
+
+## 🧪 Running Tests
+
+Run the full pytest suite (fully mocked and offline-ready):
+
+```bash
+PYTHONPATH=. uv run pytest -o asyncio_mode=auto
+```

@@ -1,88 +1,46 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-import httpx
-from src.nodes.query_generator import QueryGeneratorNode
+from unittest.mock import AsyncMock, patch
+from src.nodes.query_generator import QueryGeneratorNode, SearchQueries
 
-async def test_node_clean_json():
-    print("--- Testing QueryGeneratorNode with Clean JSON response ---")
-    mock_response = '["resep rendang padang asli", "cara memasak rendang daging sapi"]'
+async def test_query_generator_node_success():
+    print("--- Testing QueryGeneratorNode Success Case ---")
+    mock_queries = SearchQueries(queries=["resep rendang padang asli", "cara memasak rendang daging sapi"])
     
-    mock_resp_obj = MagicMock(spec=httpx.Response)
-    mock_resp_obj.status_code = 200
-    mock_resp_obj.json.return_value = {"response": mock_response}
-
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_resp_obj
+    mock_structured_llm = AsyncMock()
+    mock_structured_llm.return_value = mock_queries
+    
+    with patch("langchain_ollama.ChatOllama.with_structured_output") as mock_with_structured:
+        mock_with_structured.return_value = mock_structured_llm
         
         node = QueryGeneratorNode()
         state = {"prompt": "Bagaimana cara membuat rendang padang yang lezat?"}
         result = await node(state)
         
-        print(f"Hasil output node state update: {result}")
+        print(f"Hasil: {result}")
         assert result == {"queries": ["resep rendang padang asli", "cara memasak rendang daging sapi"]}
-        print("-> test_node_clean_json PASSED")
+        print("-> test_query_generator_node_success PASSED")
 
-async def test_node_markdown_json():
-    print("--- Testing QueryGeneratorNode with Markdown-wrapped JSON response ---")
-    mock_response = """
-    Berikut adalah query pencariannya:
-    ```json
-    [
-      "perbedaan claude dan chatgpt",
-      "keamanan data claude vs chatgpt"
-    ]
-    ```
-    Semoga membantu!
-    """
+async def test_query_generator_node_failure():
+    print("--- Testing QueryGeneratorNode Failure/Fallback Case ---")
+    mock_structured_llm = AsyncMock()
+    mock_structured_llm.side_effect = Exception("LLM API Error")
     
-    mock_resp_obj = MagicMock(spec=httpx.Response)
-    mock_resp_obj.status_code = 200
-    mock_resp_obj.json.return_value = {"response": mock_response}
-
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_resp_obj
+    with patch("langchain_ollama.ChatOllama.with_structured_output") as mock_with_structured:
+        mock_with_structured.return_value = mock_structured_llm
         
         node = QueryGeneratorNode()
-        state = {"prompt": "Apakah ChatGPT lebih aman dibanding Claude?"}
+        state = {"prompt": "Bagaimana cara membuat rendang padang yang lezat?"}
         result = await node(state)
         
-        print(f"Hasil output node state update: {result}")
-        assert result == {"queries": ["perbedaan claude dan chatgpt", "keamanan data claude vs chatgpt"]}
-        print("-> test_node_markdown_json PASSED")
-
-async def test_node_fallback_list():
-    print("--- Testing QueryGeneratorNode with list format response ---")
-    mock_response = """
-    1. "spesifikasi iphone 15 pro max"
-    2. harga pasaran iphone 15 pro max indonesia
-    - "fitur baru kamera iphone 15 pro"
-    """
-    
-    mock_resp_obj = MagicMock(spec=httpx.Response)
-    mock_resp_obj.status_code = 200
-    mock_resp_obj.json.return_value = {"response": mock_response}
-
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_resp_obj
-        
-        node = QueryGeneratorNode(max_queries=3)
-        state = {"prompt": "Berapa harga dan spesifikasi iphone 15 pro max?"}
-        result = await node(state)
-        
-        print(f"Hasil output node state update: {result}")
-        assert result == {"queries": [
-            "spesifikasi iphone 15 pro max",
-            "harga pasaran iphone 15 pro max indonesia",
-            "fitur baru kamera iphone 15 pro"
-        ]}
-        print("-> test_node_fallback_list PASSED")
+        print(f"Hasil: {result}")
+        # Fallback should return the original prompt
+        assert result == {"queries": ["Bagaimana cara membuat rendang padang yang lezat?"]}
+        print("-> test_query_generator_node_failure PASSED")
 
 async def main():
-    await test_node_clean_json()
+    await test_query_generator_node_success()
     print()
-    await test_node_markdown_json()
-    print()
-    await test_node_fallback_list()
+    await test_query_generator_node_failure()
     print("\nSemua unit test QueryGeneratorNode berhasil dijalankan!")
 
 if __name__ == "__main__":

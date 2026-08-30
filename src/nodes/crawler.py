@@ -16,10 +16,10 @@ class CrawlerNode:
     async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
         urls: List[str] = state.get("urls", [])
         if not urls:
-            logger.warning("Node 'CrawlerNode' menerima list URL kosong.")
+            logger.warning("Node 'CrawlerNode' received an empty URL list.")
             return {"documents": []}
 
-        logger.info(f"Memulai crawl batch untuk {len(urls)} URL...")
+        logger.info(f"Starting crawl batch for {len(urls)} URLs...")
         
         cleaner = ContentCleaner(min_output_length=self.min_output_length)
         dedup = ContentDeduplicator(threshold=self.dedup_threshold)
@@ -34,31 +34,27 @@ class CrawlerNode:
             for url in urls:
                 logger.info(f"Crawling URL: {url}")
                 try:
-                    # 1. Coba Static Crawler dulu
                     res = await static_crawler.fetch(url)
                     
-                    # Fallback ke Playwright jika halaman dinamis/kosong
                     if res.status_code == 200 and res.content_length < 1500:
-                        logger.info(f"Konten static sedikit ({res.content_length} karakter), fallback ke Playwright: {url}")
+                        logger.info(f"Static content too short ({res.content_length} chars), fallback to Playwright: {url}")
                         res = await dynamic_crawler.fetch(url)
                     elif res.status_code != 200:
-                        logger.info(f"Fetch static gagal ({res.status_code}), fallback ke Playwright: {url}")
+                        logger.info(f"Static fetch failed ({res.status_code}), fallback to Playwright: {url}")
                         res = await dynamic_crawler.fetch(url)
                         
                     if res.status_code != 200 or not res.html:
-                        logger.warning(f"Gagal crawl {url}: status {res.status_code}, error: {res.error}")
+                        logger.warning(f"Failed to crawl {url}: status {res.status_code}, error: {res.error}")
                         continue
                         
-                    # 2. Pembersihan & ekstraksi Markdown
                     cleaned_doc = cleaner.clean(res.html, url=url)
                     if not cleaned_doc or not cleaned_doc.content_markdown:
-                        logger.warning(f"Konten kosong setelah pembersihan: {url}")
+                        logger.warning(f"Empty content after cleansing: {url}")
                         continue
                         
-                    # 3. Deduplikasi Near-Duplicates
                     is_unique = dedup.insert(doc_id=url, text=cleaned_doc.content_markdown)
                     if not is_unique:
-                        logger.info(f"Dokumen duplikat diabaikan: {url}")
+                        logger.info(f"Duplicate document ignored: {url}")
                         continue
                         
                     documents.append({
@@ -70,9 +66,9 @@ class CrawlerNode:
                     })
                     
                 except Exception as e:
-                    logger.error(f"Error memproses URL {url}: {e}")
+                    logger.error(f"Error processing URL {url}: {e}")
         finally:
             await dynamic_crawler.close()
             
-        logger.success(f"Berhasil meng-crawl & memproses {len(documents)} dari {len(urls)} URL")
+        logger.success(f"Successfully crawled & processed {len(documents)} out of {len(urls)} URLs")
         return {"documents": documents}

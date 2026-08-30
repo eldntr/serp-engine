@@ -20,4 +20,4 @@ async def trigger_crawl(payload: CrawlTriggerRequest):
         return CrawlJobResponse(job_id=job.job_id, url=payload.url, status="queued")
     except Exception as e:
         logger.error(f"Failed to enqueue task: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Gagal memasukkan task ke queue: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to enqueue task: {str(e)}")

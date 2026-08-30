@@ -1,10 +1,12 @@
 from typing import Any, Dict, List, Optional
+from langchain_core.prompts import ChatPromptTemplate
 from src.client.factory import get_llm_client
 from src.core.config import settings
 from src.core.logger import logger
 
+
 class SynthesizerNode:
-    """LangGraph node to synthesize a grounded answer from crawled documents using an LLM."""
+    """LangGraph node to synthesize a grounded answer from crawled documents using an LLM and LangChain."""
 
     def __init__(
         self,
@@ -21,13 +23,12 @@ class SynthesizerNode:
         )
 
     def _build_context(self, documents: List[Dict[str, Any]], max_chars: int = 6000) -> str:
-        """Membangun konteks dari daftar dokumen, dipotong agar tidak melebihi batas token."""
+        """Builds context from a list of documents, truncated to prevent exceeding token limits."""
         context_parts = []
         total_chars = 0
         for i, doc in enumerate(documents, start=1):
             title = doc.get("title", "No Title")
             url = doc.get("url", "")
-            # Ambil snippet untuk menghemat konteks
             text = doc.get("text", "")[:1000]
             entry = f"[{i}] {title} ({url})\n{text}\n"
             if total_chars + len(entry) > max_chars:
@@ -41,8 +42,8 @@ class SynthesizerNode:
         documents: List[Dict[str, Any]] = state.get("documents", [])
 
         if not documents:
-            logger.warning("Node 'SynthesizerNode' tidak memiliki dokumen untuk sintesis.")
-            return {"answer": "Tidak ada dokumen yang berhasil di-crawl untuk menjawab pertanyaan ini."}
+            logger.warning("Node 'SynthesizerNode' has no documents for synthesis.")
+            return {"answer": "No documents were successfully crawled to answer this question."}
 
         context = self._build_context(documents)
 
@@ -53,21 +54,18 @@ class SynthesizerNode:
             "Answer in the same language as the user's question. Be concise and factual."
         )
 
-        user_prompt = (
-            f"User Question: {prompt}\n\n"
-            f"Web Sources:\n{context}\n\n"
-            "Grounded Answer:"
-        )
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", "User Question: {prompt}\n\nWeb Sources:\n{context}\n\nGrounded Answer:")
+        ])
 
-        logger.info(f"Mulai sintesis jawaban untuk prompt: '{prompt}'")
+        logger.info(f"Starting answer synthesis for prompt: '{prompt}'")
         try:
-            answer = await self.client.generate(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                temperature=0.3,
-            )
-            logger.success("Sintesis jawaban berhasil.")
-            return {"answer": answer}
+            chain = prompt_template | self.client
+            response = await chain.ainvoke({"prompt": prompt, "context": context})
+            
+            logger.success("Answer synthesis successful.")
+            return {"answer": response.content}
         except Exception as e:
-            logger.error(f"Gagal melakukan sintesis: {e}")
-            return {"answer": f"Terjadi kesalahan saat mensintesis jawaban: {e}"}
+            logger.error(f"Failed to perform synthesis: {e}")
+            return {"answer": f"An error occurred while synthesizing the answer: {e}"}

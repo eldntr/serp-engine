@@ -8,3 +8,4 @@ qdrant_collection_name: "serp_documents"
 qdrant_dense_dim: 1024
 rrf_k: 60
 cross_encoder_model_name: "BAAI/bge-reranker-large"
+device: "cpu"

@@ -36,6 +36,7 @@ class RetrievalConfig(BaseSettings):
     qdrant_dense_dim: int = 1024
     rrf_k: int = 60
     cross_encoder_model_name: str = "BAAI/bge-reranker-large"
+    device: str = None
 
 class LLMConfig(BaseSettings):
     llm_provider: str = "ollama"

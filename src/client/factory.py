@@ -1,10 +1,6 @@
-from typing import Dict, Type
-from src.client.base import BaseLLMClient
-from src.client.ollama import OllamaClient
-
-_CLIENT_REGISTRY: Dict[str, Type[BaseLLMClient]] = {
-    "ollama": OllamaClient,
-}
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 def get_llm_client(
     provider: str,
@@ -12,12 +8,23 @@ def get_llm_client(
     model: str,
     api_key: str = "",
     timeout: float = 60.0,
-) -> BaseLLMClient:
-    """Factory function to get the appropriate LLM client based on the provider."""
+) -> BaseChatModel:
+    """Factory function to get the appropriate LangChain Chat Model based on the provider."""
     provider_key = provider.lower()
-    if provider_key not in _CLIENT_REGISTRY:
-        raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. Supported providers are: {list(_CLIENT_REGISTRY.keys())}"
+    if provider_key == "ollama":
+        return ChatOllama(
+            base_url=api_base,
+            model=model,
+            timeout=timeout,
         )
-    client_cls = _CLIENT_REGISTRY[provider_key]
-    return client_cls(api_base=api_base, model=model, api_key=api_key, timeout=timeout)
+    elif provider_key == "openai":
+        return ChatOpenAI(
+            openai_api_base=api_base,
+            model_name=model,
+            openai_api_key=api_key,
+            timeout=timeout,
+        )
+    else:
+        raise ValueError(
+            f"Unsupported LLM provider: '{provider}'. Supported providers are: ['ollama', 'openai']"
+        )

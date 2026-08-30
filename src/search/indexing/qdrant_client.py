@@ -1,11 +1,12 @@
 import uuid
 from typing import Any, Dict, List
 from qdrant_client import AsyncQdrantClient, models
+from src.search.indexing.base import BaseIndexer
 from src.core.config import settings
 from src.core.logger import logger
 
 
-class QdrantHybridIndexer:
+class QdrantHybridIndexer(BaseIndexer):
     def __init__(
         self,
         collection_name: str = None,
@@ -41,7 +42,7 @@ class QdrantHybridIndexer:
                     )
                 },
             )
-            logger.info(f"Collection '{self.collection_name}' berhasil dibuat.")
+            logger.info(f"Collection '{self.collection_name}' successfully created.")
 
     async def upsert_document(
         self,

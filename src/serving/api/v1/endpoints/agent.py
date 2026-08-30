@@ -1,3 +1,4 @@
+from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from src.nodes.graph import build_agent_graph
@@ -10,6 +11,8 @@ class AgentSearchRequest(BaseModel):
     prompt: str
     max_queries: int = 4
     num_results_per_query: int = 3
+    thread_id: str = "default"
+    mode: Literal["linear", "react"] = "linear"
 
 
 class AgentSearchResponse(BaseModel):
@@ -23,24 +26,21 @@ class AgentSearchResponse(BaseModel):
 @router.post("/search", response_model=AgentSearchResponse)
 async def agent_search(payload: AgentSearchRequest, request: Request):
     """
-    Memicu agen RAG otonom LangGraph untuk menjawab pertanyaan user.
+    Triggers the autonomous LangGraph agent to answer the user question.
     
-    Alur:
-      1. QueryGeneratorNode  : Mengubah prompt menjadi search queries
-      2. SearchDiscoveryNode : Mencari URL via SearXNG & validasi robots.txt
-      3. CrawlerNode         : Crawl halaman web & ekstrak teks Markdown
-      4. IndexerNode         : Encode & simpan ke Qdrant
-      5. SynthesizerNode     : Sintesis jawaban berlandaskan dokumen dari web
+    Supports:
+      - 'linear' mode: deterministic sequential execution.
+      - 'react' mode: dynamic tool-calling loop execution.
     """
-    # Gunakan indexer dari app.state jika tersedia (untuk koleksi yang persisten)
     indexer = getattr(request.app.state, "indexer", None)
 
-    logger.info(f"Menjalankan Agent Graph untuk prompt: '{payload.prompt}'")
+    logger.info(f"Running Agent Graph for prompt: '{payload.prompt}' in mode: '{payload.mode}'")
     
     graph = build_agent_graph(
         indexer=indexer,
         max_queries=payload.max_queries,
         num_results_per_query=payload.num_results_per_query,
+        mode=payload.mode,
     )
     
     initial_state = {
@@ -50,9 +50,11 @@ async def agent_search(payload: AgentSearchRequest, request: Request):
         "documents": [],
         "indexed_count": 0,
         "answer": "",
+        "messages": [],
     }
 
-    final_state = await graph.ainvoke(initial_state)
+    config = {"configurable": {"thread_id": payload.thread_id}}
+    final_state = await graph.ainvoke(initial_state, config=config)
 
     return AgentSearchResponse(
         prompt=final_state["prompt"],

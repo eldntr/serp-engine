@@ -16,25 +16,24 @@ class SearchDiscoveryNode:
     async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
         queries: List[str] = state.get("queries", [])
         if not queries:
-            logger.warning("Node 'SearchDiscoveryNode' menerima list query kosong.")
+            logger.warning("Node 'SearchDiscoveryNode' received an empty query list.")
             return {"urls": []}
             
         discovered_urls: List[str] = []
         
         for q in queries:
-            logger.info(f"Mencari URL untuk query: '{q}' via SearXNG")
+            logger.info(f"Searching URLs for query: '{q}' via SearXNG")
             try:
                 urls = await self.discovery.search(q, num_results=self.num_results_per_query)
                 for u in urls:
                     if u not in discovered_urls:
-                        # Validasi dengan robots.txt
                         is_allowed = await self.robots.can_fetch(u)
                         if is_allowed:
                             discovered_urls.append(u)
                         else:
-                            logger.info(f"URL dilewati karena aturan robots.txt: {u}")
+                            logger.info(f"URL skipped due to robots.txt rules: {u}")
             except Exception as e:
-                logger.error(f"Gagal mencari URL untuk query '{q}': {e}")
+                logger.error(f"Failed to search URLs for query '{q}': {e}")
                 
-        logger.success(f"Berhasil menemukan {len(discovered_urls)} URL teruji robots.txt")
+        logger.success(f"Successfully discovered {len(discovered_urls)} URLs verified by robots.txt")
         return {"urls": discovered_urls}
